@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Grupos de Investigación</title>
+
+  <!-- jQuery y DataTables -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
+  <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+
+  <!-- SheetJS -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px;
+      background: #fff;
+      color: #333;
+    }
+    .contenedor {
+      max-width: 1200px;
+      margin: auto;
+      padding: 20px;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    }
+    .filters {
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 15px;
+    }
+    .filters div {
+      display: flex;
+      flex-direction: column;
+    }
+    input, select {
+      padding: 6px;
+      width: 220px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+    table.dataTable {
+      width: 100%;
+      border: 1px solid #ccc;
+    }
+    th {
+      background: #e6e6e6;
+    }
+    .btn-ver {
+      background: #ccc;
+      padding: 6px 10px;
+      border-radius: 6px;
+      text-decoration: none;
+      color: #000;
+    }
+    .btn-ver:hover {
+      background: #4EC600;
+      color: #fff;
+    }
+    .dataTables_filter {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="contenedor">
+
+  <div class="filters">
+    <div>
+      <label>Grupo</label>
+      <input type="text" id="filtroGrupo" placeholder="Buscar grupo...">
+    </div>
+    <div>
+      <label>Línea de Investigación</label>
+      <select id="filtroLinea">
+        <option value="">-- Todas --</option>
+      </select>
+    </div>
+    <div>
+      <label>Coordinador</label>
+      <input type="text" id="filtroCoord" placeholder="Buscar coordinador...">
+    </div>
+  </div>
+
+  <table id="tabla" class="display">
+    <thead>
+      <tr>
+        <th>Grupo</th>
+        <th>Línea Investigación</th>
+        <th>Coordinador</th>
+        <th>Ficha</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+</div>
+
+<script>
+const EXCEL_URL = "https://raw.githubusercontent.com/jdcaramutti/grupos_investigacion/main/grupos_investigacion.xlsx";
+
+let tabla;
+
+async function cargarDatos() {
+  try {
+    const res = await fetch(EXCEL_URL);
+    const buffer = await res.arrayBuffer();
+
+    const workbook = XLSX.read(buffer, { type: "array" });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+
+    const datos = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+
+    llenarSelectLineas(datos);
+    inicializarTabla(datos);
+
+  } catch (e) {
+    console.error(e);
+    alert("Error cargando el archivo Excel desde GitHub");
+  }
+}
+
+function llenarSelectLineas(datos) {
+  const select = $('#filtroLinea');
+  const lineas = [...new Set(datos.map(d => d["Línea Investigación"]).filter(Boolean))].sort();
+  lineas.forEach(l => select.append(`<option value="${l}">${l}</option>`));
+}
+
+function inicializarTabla(datos) {
+  tabla = $('#tabla').DataTable({
+    data: datos,
+    columns: [
+      { data: 'Grupo' },
+      { data: 'Línea Investigación' },
+      { data: 'Coordinador' },
+      {
+        data: 'Ficha',
+        render: data =>
+          data ? `<a href="${data}" target="_blank" class="btn-ver">🔎</a>` : ''
+      }
+    ],
+    language: {
+      url: "https://cdn.datatables.net/plug-ins/1.13.4/i18n/es-ES.json"
+    },
+    pageLength: 10,
+    dom: '<"top"l>rt<"bottom"ip><"clear">'
+  });
+
+  $.fn.dataTable.ext.search.push(function(settings, data) {
+    const grupo = $('#filtroGrupo').val().toLowerCase();
+    const linea = $('#filtroLinea').val().toLowerCase();
+    const coord = $('#filtroCoord').val().toLowerCase();
+
+    return (!grupo || data[0].toLowerCase().includes(grupo)) &&
+           (!linea || data[1].toLowerCase().includes(linea)) &&
+           (!coord || data[2].toLowerCase().includes(coord));
+  });
+
+  $('#filtroGrupo, #filtroCoord').on('keyup', () => tabla.draw());
+  $('#filtroLinea').on('change', () => tabla.draw());
+}
+
+cargarDatos();
+</script>
+
+</body>
+</html>
